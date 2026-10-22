@@ -9,15 +9,14 @@ Important interpretation note: This pipeline generates and prioritizes computati
 - Overview
 - Main analytical features
 - Workflow
-- Repository structure
-- Analysis modes
+- Conceptual network layers
 - Required inputs
 - Key parameters and definitions
+- LOLA background and filtering
 - Software and dependencies
-- Running the workflow
+- Running the workflow (Quick Start)
 - Expected outputs
-- Reproducibility and data-quality checks
-- Limitations and interpretation
+- Installation
 - Troubleshooting
 - Data resources
 - Citation
@@ -197,6 +196,15 @@ devtools::install_github("YourGitHubUsername/LTRnet")
 
 - **File not found errors:** `LTRnet` features robust path checking. If you encounter a file error, ensure you are passing the *absolute path* to your files, not just the file names.
 - **Missing dependencies:** If a specific Bioconductor package fails to install automatically, try installing it manually using `BiocManager::install("PackageName")`.
+
+## Data Resources
+
+One of the core strengths of `LTRnet` is its automated integration with diverse multi-omics databases.
+
+*   **Genomic Annotations (Dynamic TxDb):** Automatically retrieves host gene coordinates and Transcription Start Sites (TSS) via Bioconductor's `TxDb` packages (e.g., `TxDb.Hsapiens.UCSC.hg38.knownGene`). This allows seamless switching between species (like Human to Mouse) without needing local GTF/GFF files.
+*   **TF Binding Landscapes:** Processes user-provided **ChIP-Atlas** BED/RDS files to dynamically compile custom **LOLA** (Locus Overlap Analysis) background databases on the fly for LTR enrichment scoring.
+*   **Regulatory Networks (TFTF):** Incorporates a comprehensive compendium of 9 distinct transcriptional regulatory databases to build robust TF-Gene and TF-TF bridges. These include: *hTFtarget, KnockTF, JASPAR (FIMO & PWMEnrich), ENCODE, CHEA, TRRUST, GTRD, and ChIP-Atlas*.
+*   **Protein-Protein Interactions (PPI):** Directly queries the **STRINGdb** API (v11.5 default) to map high-confidence protein interaction networks, filtering out isolated nodes to ensure structural integrity in the final regulatory model.
 
 ## Citation
 
