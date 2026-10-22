@@ -1,6 +1,9 @@
-An Integrative R Pipeline for LTR-Mediated Regulatory Network Analysis
-XXX is an R package designed to prioritize candidate regulatory relationships involving long terminal repeats (LTRs), integrating mobile element expression, genomic coordinates, transcription factor (TF) evidence, protein–protein interaction (PPI) networks, and three-dimensional (3D) chromatin contact information.
-The workflow was developed for a hepatocellular carcinoma (HCC) use case, but is intended to be adaptable to other human disease or tissue datasets when compatible expression, annotation, TF-binding, and chromatin-interaction data are available.
+# An Integrative R Pipeline for LTR-Mediated Regulatory Network Analysis  
+
+LTRnet is an R package designed to prioritize candidate regulatory relationships involving long terminal repeats (LTRs), integrating mobile element expression, genomic coordinates, transcription factor (TF) evidence, protein–protein interaction (PPI) networks, and three-dimensional (3D) chromatin contact information.  
+
+The workflow was developed for a hepatocellular carcinoma (HCC) use case, but is intended to be adaptable to other human disease or tissue datasets when compatible expression, annotation, TF-binding, and chromatin-interaction data are available.  
+
 Important interpretation note: This pipeline generates and prioritizes computationally supported hypotheses. An LTR–TF overlap, LOLA enrichment, TFTF prediction, STRING association, or chromatin-loop overlap does not, on its own, prove that an LTR directly regulates a target gene. Candidate relationships require independent biological and experimental validation.
 # Contents
 - Overview
@@ -85,31 +88,29 @@ In forward mode, the network is shorter because a DEG-dependent gene-side TF ana
 Upregulated LTR locus → LTR-associated TF → predicted target gene within the ±100 kb window
 The arrows represent computationally inferred or integrated relationships. They should not be interpreted as experimentally demonstrated causal steps unless supported by additional evidence.
 ## Required inputs
-| Input | Purpose | Important checks |
+
+`LTRnet` is designed to minimize data formatting burdens. Only a few standard output files from upstream tools are required. The corresponding argument names in `run_LTR_pipeline()` are listed below.
+
+| Input Parameter | File Description & Purpose | Important Checks |
 |---|---|---|
-| TEtranscripts differential-expression output | Identifies differentially expressed TE/LTR families or subfamilies. | Keep the family/subfamily identifier, fold change, adjusted p-value, and any expression statistics needed by the script. |
-| Gene differential-expression table (reverse mode) | Filters LTR-proximal genes to upregulated DEGs. | Include a consistent gene identifier, `log2FoldChange` (or equivalent), and adjusted p-value. Match identifiers to the gene annotation used later. |
-| TE/LTR genome annotation | Maps TE family/subfamily annotations to genomic insertion coordinates. | Use an annotation compatible with the selected reference build and the identifiers in the TEtranscripts output. |
-| Gene annotation | Supplies gene spans, gene names/IDs, and transcription start sites (TSSs). | Ensure gene IDs are harmonized across DEG, TFTF, and promoter tables. |
-| ChIP-Atlas TF peak BED files | Provides TF-associated peak regions for overlap and enrichment. | Confirm genome assembly, chromosome naming, BED coordinate convention, TF/sample metadata, and the origin of each experiment. |
-| LOLA region database/background | Defines the reference region sets used for enrichment testing. | Use a relevant background universe and keep it consistent with the target region set and genome build. |
-| TFTF-compatible regulatory resources | Supports gene–TF prediction from multiple resources. | Check resource availability, database versions, organism, gene-ID mapping, and the number of supporting databases reported by the installed version. |
-| STRING access or interaction data | Connects proteins/TFs by known or predicted associations. | STRING queries may require a working internet connection. Use consistent human gene/protein identifiers. |
-| Chromatin-loop data in BEDPE or a compatible format | Tests whether LTRs and target promoters overlap opposite loop anchors. | Confirm anchor columns, chromosome naming, coordinate build, and whether the data represent the tissue/cell model relevant to the question. |
+| **`te_file`** | **TEtranscripts differential-expression output:** Identifies differentially expressed TE/LTR families. | Keep the family/subfamily identifier, fold change, adjusted p-value columns. |
+| **`rmsk_file`** | **TE/LTR genome annotation (GTF/GFF):** Maps TE subfamilies to genomic coordinates (e.g., RepeatMasker). | Use an annotation compatible with your selected reference build (e.g., hg38). |
+| **`chip_file`** | **ChIP-Atlas TF peak file (BED or RDS):** Provides TF-associated peak regions for overlap and enrichment. | Confirm genome assembly matches your RMSK file. Both `.bed` and serialized `.rds` formats are supported. |
+| **`deg_file`** | **Gene differential-expression table (Required for Reverse Mode only):** Filters LTR-proximal genes to actual DEGs. | Include a consistent gene identifier (Symbol), `log2FoldChange`, and adjusted p-value (`padj`). |
+| **`hic_bedpe`** | **Chromatin-loop data (Optional):** Tests whether LTRs and target promoters overlap opposite loop anchors (Step 13). | Confirm anchor columns, chromosome naming, and coordinate build. Must be in BEDPE format. |
+| **`txdb_pkg`** | **Host Gene Annotation Package (Parameter):** Supplies gene spans and TSS coordinates automatically. | Defaults to `"TxDb.Hsapiens.UCSC.hg38.knownGene"`. Change this parameter for other species (e.g., mm10 for mouse). |
 
 ## Key parameters and definitions
-The values below reflect the analysis design described for this workflow.
-
-| Parameter | Analysis definition described in the study | Why it matters |
+While you can view the complete list of all adjustable parameters and their code syntax in R by running `?run_LTR_pipeline`, the table below highlights the most critical biological thresholds used in the workflow and explains the rationale behind them:
+| Core Parameter | Default Value | Biological Rationale & Why it matters |
 |---|---|---|
-| LTR differential-expression threshold | `log2FoldChange > 0.585` and adjusted `p < 0.05` for upregulated LTRs | Selects LTR families/subfamilies for downstream locus analysis. The threshold is equivalent to a fold change greater than approximately 1.5 on the linear scale. |
-| Upregulated DEG threshold (reverse mode) | `log2FoldChange > 0.585` and adjusted `p < 0.05` | Focuses the reverse-mode list on nearby genes with increased expression in the case group. |
-| LTR-proximal gene window | ±100 kb around each candidate LTR locus | A heuristic search window for candidate cis-proximal genes; not a demonstrated enhancer range. |
-| Gene promoter window for loop checks | 2,000 bp upstream and 500 bp downstream of the TSS, interpreted with gene strand | Defines the promoter interval compared with chromatin-loop anchors. |
-| LOLA significance | Fisher's exact test/enrichment statistics, with adjusted significance reported using `q < 0.05` in the study description | Prioritizes TF-associated region sets enriched in the candidate LTR regions. Check the current code for any additional overlap, p-value, odds-ratio, or support-count filters. |
-| Reverse-mode gene–TF support | At least 8 independent regulatory resources (`Hit_DB_Count ≥ 8`) in the described analysis | Selects strongly cross-supported candidate TF–gene relationships. |
-| Forward-mode TF support | At least 2 distinct LTR-associated TFs and at least 6 independent regulatory resources in the described analysis | Reduces predictions with weak or single-source support before the proximity filter. |
-| STRING confidence | Score threshold around `700` (equivalent to `0.700` on a 0–1 scale) in the described analysis | Restricts PPI bridging to higher-confidence protein associations. |
+| **LTR / DEG log2FoldChange** | `0.585` | Selects LTR families and host genes with a fold change greater than ~1.5 on the linear scale. |
+| **LTR-proximal window** | `100` (kb) | A heuristic cis-regulatory search window (±100 kb) around each candidate LTR locus to identify potential target genes. |
+| **TFTF support count (Reverse)** | `8` (databases) | Selects strongly cross-supported candidate TF–gene relationships by requiring evidence from at least 8 independent regulatory resources. |
+| **STRING PPI confidence** | `700` | Restricts protein-protein bridging to higher-confidence (score ≥ 0.700) experimental or predicted protein associations. |
+| **Loop promoter window** | `-2000 to +500` (bp) | Defines the promoter interval around the Transcription Start Site (TSS) to be compared with 3D chromatin-loop anchors. |  
+
+*(Note: To easily override any of these defaults, use the `custom_config` argument in the main function as shown in the Customizing Parameters section below.)*
 
 ## LOLA background and filtering
 The enrichment background is especially important: a background containing all genomic regions can answer a different question from one containing only expressed/eligible LTR loci. The described workflow uses an eligible LTR-region universe for LTR enrichment rather than treating every genomic interval as equally testable.
@@ -139,3 +140,69 @@ The enrichment background is especially important: a background containing all g
 | **TFTF** | *latest* | GitHub (`WangJin93/TFTF`) | Custom biologist-created pkg to interrogate trans-regulatory interactions across 9 databases . |
 | **TEtranscripts** | `>= 2.2.4` | Python / CLI | Standalone pipeline for quantification of raw RNA-seq reads map back to TEs (optional pre-processing). |
 | **libcurl / libxml2 / libssl / libgsl** | *(OS native)* | OS Libraries | Underlies parsing, network-fetching, and math (install on Linux/CentOS using `apt-get` or `yum` if packages fail). |
+
+## Running the workflow (Quick Start)
+`LTRnet` features a highly streamlined main function, `run_LTR_pipeline()`, which automatically handles all sub-modules (from genomic annotation to network visualization) in a single run.
+### 1. Test Drive with Built-in Demo Data
+The package includes a highly-compressed, locus-specific demo dataset. You can run the entire pipeline fastly using the `use_demo = TRUE` switch:
+```R
+library(LTRnet)
+# Run the complete Reverse Mode pipeline with built-in demo data
+res_demo <- run_LTR_pipeline(pipeline_mode = "reverse",use_demo = TRUE, output_dir = "./LTRnet_Demo_Output")
+```
+### 2. Run with Your Own Research Data
+To analyze your own cohorts, simply set use_demo = FALSE and provide the absolute paths to your data. LTRnet also supports dynamic species annotation via the txdb_pkg parameter, allowing seamless application to mouse models or other organisms without changing the source code.
+```R
+library(LTRnet)
+# Example: Forward Mode analysis on user data
+res_user <- run_LTR_pipeline(pipeline_mode = "forward", use_demo= FALSE,
+  # User input files
+  te_file       = "path/to/your_TEtranscripts.xlsx",
+  rmsk_file     = "path/to/your_rmsk.gtf",
+  chip_file     = "path/to/your_ChIP_Peaks.bed", # Supports .bed or .rds
+  deg_file      = "path/to/your_DEGs.xlsx",      # Required for reverse mode
+  hic_bedpe     = "path/to/your_Loops.bedpe",    # Optional spatial validation
+  # Dynamic annotation for non-human datasets (e.g., Mouse mm10)
+  # txdb_pkg    = "TxDb.Mmusculus.UCSC.mm10.knownGene",
+  # custom_config = list(taxonomy_id = 10090),
+  output_dir    = "./My_Research_Results"
+)
+```
+## Expected outputs
+To maintain a clean and professional workspace, `LTRnet` automatically organizes its outputs into a two-tier directory structure within your specified `output_dir`:
+### 1. `1_Intermediate_Data/`
+Contains background tracking, intermediate tables, and serialized R objects for reproducibility. This includes all data processing from Step 1 to Step 11:
+- `01_upregulated_LTR.csv`: Filtered TEtranscripts outputs.
+- `02_query_gr.rds` & `02_universe_gr.rds`: Parsed genomic coordinates.
+- `03_chip_processed.csv`: Cleaned ChIP-Atlas background.
+- `05_lola_ltr_significant.csv`: LOLA enrichment stats.
+- `07_TFTF_Full_TF_Gene_Network.csv`: Inferred regulatory bridges.
+- `08_final_integrated_results.csv`: The integrated tabular results linking LTRs, TFs, and candidate genes.
+- `09_PPI_Network_STRINGdb_...`: Extracted protein-protein interactions.
+- `11_Network_...`: Formatted edge and node lists prepared for final plotting.
+
+### 2. `2_Final_Outputs/`
+Contains the ultimate deliverables (Step 12 and 13) .
+- **`12_LTR_TF_Gene_Network_...pdf/png`**: High-resolution, multi-tier regulatory network visualizations (Sankey-like waterfall plots).
+- **`13_HepG2_HiC_Verified_Loops.csv`**: (If Hi-C provided) A definitive list of LTR-Promoter pairs physically supported by 3D chromatin contacts.
+## Installation
+`LTRnet` is built as a standard R package. You can easily install it directly from GitHub using the `devtools` package. This process will automatically resolve and install most of the required Bioconductor and CRAN dependencies.
+```R
+# Install devtools if not already installed
+if (!requireNamespace("devtools", quietly = TRUE)) {install.packages("devtools")}
+# Install LTRnet from GitHub
+devtools::install_github("YourGitHubUsername/LTRnet")
+```
+## Troubleshooting
+
+- **File not found errors:** `LTRnet` features robust path checking. If you encounter a file error, ensure you are passing the *absolute path* to your files, not just the file names.
+- **Missing dependencies:** If a specific Bioconductor package fails to install automatically, try installing it manually using `BiocManager::install("PackageName")`.
+
+## Citation
+
+If you use `LTRnet` in your research, please cite our upcoming publication:
+> *(Insert your paper citation here once published. E.g., Author A, Author B. "An Integrative R Pipeline for LTR-Mediated Regulatory Network Analysis in Cancer." Journal Name, 2026.)*
+
+## License
+
+This project is licensed under the [MIT License](LICENSE) - see the LICENSE file for details.   
